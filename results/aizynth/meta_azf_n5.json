@@ -1,0 +1,76 @@
+{
+  "tag": "azf",
+  "route_set": "n5",
+  "method": "AiZynthFinder",
+  "n_targets": 8,
+  "n_solved": 3,
+  "solve_rate": 0.375,
+  "total_time_s": 312.4093909263611,
+  "mean_time_per_target_s": 39.051173865795135,
+  "config": {
+    "algorithm": "mcts",
+    "iteration_limit": 100,
+    "time_limit": 120,
+    "policy": "public USPTO",
+    "stock": "PaRoutes n5"
+  },
+  "seed": 42,
+  "per_target": [
+    {
+      "index": 0,
+      "smiles": "COc1ccc(F)c(-c2ccc(COc3cc(C(CC(=O)O)C4CC4)ccc3F)nc2CC(C)(C)C)c1",
+      "solved": true,
+      "n_routes": 5,
+      "time_s": 43.4681761264801
+    },
+    {
+      "index": 1,
+      "smiles": "CCc1cc2nncc(N3CCc4[nH]nc(C(=O)NC5CC5)c4C3)c2cc1OC",
+      "solved": false,
+      "n_routes": 6,
+      "time_s": 50.91365456581116
+    },
+    {
+      "index": 2,
+      "smiles": "Clc1ccc(-n2cncn2)c(Cc2nc3c(NCCC4CCCCN4)nccc3o2)c1",
+      "solved": false,
+      "n_routes": 6,
+      "time_s": 39.96088528633118
+    },
+    {
+      "index": 3,
+      "smiles": "CCOCc1nc2c(N)nc3ccc(O)cc3c2n1CC(C)(C)NS(C)(=O)=O",
+      "solved": true,
+      "n_routes": 5,
+      "time_s": 21.17074179649353
+    },
+    {
+      "index": 4,
+      "smiles": "O=C(O)CCNC(=O)c1nc(-c2ccncc2)c2c(cc(-c3ccccc3)c(=O)n2CC2CCCCC2)c1O",
+      "solved": true,
+      "n_routes": 11,
+      "time_s": 21.084919452667236
+    },
+    {
+      "index": 5,
+      "smiles": "CC(C)CON=C(C(=O)NC1C(=O)N2C(C(=O)O)=CCS[C@H]12)c1csc(N)n1",
+      "solved": false,
+      "n_routes": 9,
+      "time_s": 42.03548789024353
+    },
+    {
+      "index": 6,
+      "smiles": "CCc1cc2c(Br)cnnc2cc1OC",
+      "solved": false,
+      "n_routes": 6,
+      "time_s": 57.263049602508545
+    },
+    {
+      "index": 7,
+      "smiles": "CN(CCCOc1ccc(-c2cc3c(ncn3C)c(C#N)n2)cc1C(F)(F)F)C(=O)C1CCCCN1C",
+      "solved": false,
+      "n_routes": 7,
+      "time_s": 36.32659864425659
+    }
+  ]
+}

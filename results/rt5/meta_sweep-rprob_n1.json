@@ -1,0 +1,54 @@
+{
+  "tag": "sweep-rprob",
+  "route_set": "n1",
+  "method": "ReactionT5-MCTS",
+  "n_targets": 3,
+  "n_solved": 0,
+  "solve_rate": 0.0,
+  "mean_best_instock_frac": 0.642,
+  "total_time_s": 236.8362331390381,
+  "mean_time_per_target_s": 78.94541104634602,
+  "config": {
+    "expansion_width": 5,
+    "iterations": 100,
+    "c_puct": 1.4,
+    "max_depth": 12,
+    "rollout_width": 1,
+    "rollout_policy": "prob",
+    "model_budget": 15
+  },
+  "model_stats": {
+    "model_calls": 8,
+    "cache_hits": 4274
+  },
+  "seed": 42,
+  "per_target": [
+    {
+      "index": 0,
+      "smiles": "CC(C)(C)[C@@H](CS(C)(=O)=O)Nc1nc(-c2c[nH]c3ncc(F)cc23)ncc1F",
+      "solved": false,
+      "n_routes": 0,
+      "best_n_reactions": 0,
+      "best_instock_frac": 0.0,
+      "time_s": 0.001804351806640625
+    },
+    {
+      "index": 1,
+      "smiles": "COc1ccc(F)c(-c2ccc(COc3cccc(C(CC(=O)O)C4CC4)c3)nc2CC(C)(C)C)c1",
+      "solved": false,
+      "n_routes": 0,
+      "best_n_reactions": 0,
+      "best_instock_frac": 0.957,
+      "time_s": 2.945396900177002
+    },
+    {
+      "index": 2,
+      "smiles": "CCCCCCOc1ccc(C(=O)Nc2ccccc2Oc2cccc(OC(C)c3nnn[nH]3)c2)cc1",
+      "solved": false,
+      "n_routes": 0,
+      "best_n_reactions": 0,
+      "best_instock_frac": 0.97,
+      "time_s": 233.88871002197266
+    }
+  ]
+}

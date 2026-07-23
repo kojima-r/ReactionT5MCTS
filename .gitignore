@@ -1,0 +1,21 @@
+# logs
+logs/
+*.log
+results/STATUS.txt
+
+# generated caches
+cache/
+**/__pycache__/
+*.pyc
+
+# large downloaded models / data (obtained via download_public_data)
+aizynth_data/
+
+# PaRoutes benchmark repo + data (cloned separately; multi-GB)
+paroutes/
+
+# scratch
+nohup.out
+
+# local Claude Code settings / temp files
+.claude/*.tmp.*

@@ -1,0 +1,11 @@
+{
+  "method": "AiZynthFinder",
+  "tag": "azf",
+  "route_set": "n5",
+  "n_targets": 8,
+  "solved_targets": 3,
+  "solve_rate": 0.375,
+  "top1": 0.0,
+  "top5": 0.0,
+  "top10": 0.0
+}

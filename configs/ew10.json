@@ -1,0 +1,8 @@
+{
+  "expansion_width": 10,
+  "iterations": 100,
+  "c_puct": 1.4,
+  "max_depth": 7,
+  "rollout_width": 1,
+  "model_budget": 30
+}

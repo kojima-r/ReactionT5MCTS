@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset='utf-8'><title>ReactionT5-MCTS vs AiZynthFinder on PaRoutes</title><style>
+    body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+         max-width:1100px;margin:2rem auto;padding:0 1rem;line-height:1.55;color:#1a1a1a}
+    h1{border-bottom:3px solid #2c7fb8;padding-bottom:.3rem}
+    h2{margin-top:2rem;color:#2c7fb8}
+    table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem}
+    th,td{border:1px solid #ccc;padding:.4rem .6rem;text-align:right}
+    th:first-child,td:first-child{text-align:left}
+    th{background:#f0f6fb}
+    tbody tr:nth-child(even){background:#fafafa}
+    code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px}
+    em{color:#666}
+    @media (prefers-color-scheme: dark){
+      body{background:#111;color:#e6e6e6} th{background:#1c2b36}
+      tbody tr:nth-child(even){background:#181818} code{background:#222}
+      th,td{border-color:#444}}
+    </style></head><body><h1>Retrosynthesis Route Planning: ReactionT5-MCTS vs AiZynthFinder on PaRoutes</h1>
+<p>*Generated 2026-07-23 09:39 UTC*</p>
+<p>This report evaluates a Monte-Carlo Tree Search (MCTS) retrosynthetic planner
+that uses <strong>ReactionT5</strong> (`sagawa/ReactionT5v2-retrosynthesis`) as the one-step
+retrosynthesis model, benchmarked on the <strong>PaRoutes</strong> n1/n5 route sets, and
+compares it with <strong>AiZynthFinder</strong> and the published literature values.</p>
+<p><strong>Reproducibility.</strong> All runs use a fixed random seed. ReactionT5 beam search is
+deterministic and one-step predictions are memoised in a shared on-disk cache,
+so re-running yields identical routes.</p>
+<p><strong>Scope note.</strong> Experiments were run on <strong>CPU only</strong> (no GPU available), where a
+single ReactionT5 beam-search call on a drug-like PaRoutes target costs ~30-45 s.
+The full benchmark (10,000 targets/set) is therefore intractable here, and each
+target is additionally capped at a fixed *budget* of fresh one-step model
+evaluations. ReactionT5-MCTS and AiZynthFinder were run on the **first N
+targets** of each set (see tables). The literature columns are the
+full-benchmark published values and are shown for context — the absolute counts
+are not directly comparable to the compute-bounded subset runs, but the
+comparison between ReactionT5-MCTS and AiZynthFinder is like-for-like on the
+identical subset.</p>
+<p>Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): <strong>sweep-base</strong>.</p><h2>1. Hyperparameter sweep (ReactionT5-MCTS, n1 subset)</h2><p>Base config: <code>expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</code>. Each row varies one parameter.</p><table><thead><tr><th>config (tag)</th><th>route set</th><th>params</th><th>solved</th><th>solve rate</th><th>in-stock frac</th><th>top-1</th><th>top-5</th><th>top-10</th><th>total time</th><th>time/target</th></tr></thead><tbody><tr><td>base</td><td>n1</td><td>expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>1/3</td><td>0.333</td><td>0.661</td><td>0.000</td><td>0.000</td><td>0.000</td><td>9.7 min</td><td>3.2 min</td></tr><tr><td>c0p5</td><td>n1</td><td>expansion_width=5, iterations=100, c_puct=0.5, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>1/3</td><td>0.333</td><td>0.660</td><td>0.000</td><td>0.000</td><td>0.000</td><td>1.5</td><td>0.5</td></tr><tr><td>c3p0</td><td>n1</td><td>expansion_width=5, iterations=100, c_puct=3.0, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>1/3</td><td>0.333</td><td>0.661</td><td>0.000</td><td>0.000</td><td>0.000</td><td>4.4</td><td>1.5</td></tr><tr><td>ew3</td><td>n1</td><td>expansion_width=3, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>1/3</td><td>0.333</td><td>0.621</td><td>0.000</td><td>0.000</td><td>0.000</td><td>6.4</td><td>2.1</td></tr><tr><td>it200</td><td>n1</td><td>expansion_width=5, iterations=200, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>1/3</td><td>0.333</td><td>0.661</td><td>0.000</td><td>0.000</td><td>0.000</td><td>5.7</td><td>1.9</td></tr><tr><td>md8</td><td>n1</td><td>expansion_width=5, iterations=100, c_puct=1.4, max_depth=8, rollout_width=1, rollout_policy=stock, model_budget=15</td><td>0/3</td><td>0.000</td><td>0.642</td><td>0.000</td><td>0.000</td><td>0.000</td><td>1.2 min</td><td>23.1</td></tr><tr><td>rprob</td><td>n1</td><td>expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=prob, model_budget=15</td><td>0/3</td><td>0.000</td><td>0.642</td><td>0.000</td><td>0.000</td><td>0.000</td><td>3.9 min</td><td>1.3 min</td></tr></tbody></table><h2>2. Main comparison: literature vs ReactionT5-MCTS (best) vs AiZynthFinder</h2><table><thead><tr><th>source / method</th><th>route set</th><th>n targets</th><th>solved</th><th>solve rate</th><th>in-stock frac</th><th>top-1</th><th>top-5</th><th>top-10</th><th>total time</th><th>time/target</th></tr></thead><tbody><tr><td>Genheden 2022 (v1) — MCTS</td><td>n1</td><td>10000</td><td>9714</td><td>0.971</td><td>N/A</td><td>0.200</td><td>0.550</td><td>0.610</td><td>N/A</td><td>N/A</td></tr><tr><td>Genheden 2022 (v1) — MCTS</td><td>n5</td><td>10000</td><td>9676</td><td>0.968</td><td>N/A</td><td>0.090</td><td>0.340</td><td>0.420</td><td>N/A</td><td>N/A</td></tr><tr><td>Genheden 2022 (v1) — Retro*</td><td>n1</td><td>10000</td><td>9726</td><td>0.973</td><td>N/A</td><td>0.170</td><td>0.480</td><td>0.540</td><td>N/A</td><td>N/A</td></tr><tr><td>Genheden 2022 (v1) — Retro*</td><td>n5</td><td>10000</td><td>9703</td><td>0.970</td><td>N/A</td><td>0.080</td><td>0.300</td><td>0.380</td><td>N/A</td><td>N/A</td></tr><tr><td>PaRoutes v2.0 — MCTS</td><td>n1</td><td>10000</td><td>9716</td><td>0.972</td><td>N/A</td><td>0.237</td><td>0.511</td><td>0.541</td><td>N/A</td><td>N/A</td></tr><tr><td>PaRoutes v2.0 — MCTS</td><td>n5</td><td>10000</td><td>9689</td><td>0.969</td><td>N/A</td><td>0.124</td><td>0.358</td><td>0.406</td><td>N/A</td><td>N/A</td></tr><tr><td>PaRoutes v2.0 — Retro*</td><td>n1</td><td>10000</td><td>9728</td><td>0.973</td><td>N/A</td><td>0.203</td><td>0.452</td><td>0.485</td><td>N/A</td><td>N/A</td></tr><tr><td>PaRoutes v2.0 — Retro*</td><td>n5</td><td>10000</td><td>9729</td><td>0.973</td><td>N/A</td><td>0.114</td><td>0.337</td><td>0.390</td><td>N/A</td><td>N/A</td></tr><tr><td>This work — AiZynthFinder</td><td>n1</td><td>8</td><td>2</td><td>0.250</td><td>N/A</td><td>0.000</td><td>0.000</td><td>0.000</td><td>5.1 min</td><td>38.5</td></tr><tr><td>This work — AiZynthFinder</td><td>n5</td><td>8</td><td>3</td><td>0.375</td><td>N/A</td><td>0.000</td><td>0.000</td><td>0.000</td><td>5.2 min</td><td>39.1</td></tr><tr><td>This work — ReactionT5-MCTS (best config: base)</td><td>n1</td><td>8</td><td>1</td><td>0.125</td><td>0.824</td><td>0.000</td><td>0.000</td><td>0.000</td><td>35.2 min</td><td>4.4 min</td></tr><tr><td>This work — ReactionT5-MCTS (best config: base)</td><td>n5</td><td>8</td><td>2</td><td>0.250</td><td>0.947</td><td>0.000</td><td>0.000</td><td>0.000</td><td>75.7 min</td><td>9.5 min</td></tr></tbody></table><h3>Notes
+- **solved** = targets with at least one fully-in-stock route; **solve rate** = solved / n.
+- **top-k** = fraction of targets whose exact reference route is recovered (distance 0) in top-k.
+- **time** = CPU wall-clock; literature reports none and used the full benchmark.
+- AiZynthFinder uses the public USPTO expansion policy + PaRoutes stock.</h3></body></html>
