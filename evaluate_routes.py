@@ -47,7 +47,44 @@ _rtmod.ReactionTreeWrapper._index_permutations = _PermDict(
     _rtmod.ReactionTreeWrapper._index_permutations
 )
 
-from analysis.route_quality import _analyze_routes  # noqa: E402
+import signal  # noqa: E402
+
+from analysis.route_quality import _analyze_routes, is_solved  # noqa: E402
+
+# fork-inherited (copy-on-write) worker data: routes/references stay in the
+# parent's memory and workers receive only integer indices — never pickle the
+# (potentially huge) route lists through the task queue.
+_EVAL = {"routes": None, "refs": None, "ks": [1, 5, 10], "timeout": 60}
+
+
+class _EvalTimeout(Exception):
+    pass
+
+
+def _raise_timeout(signum, frame):
+    raise _EvalTimeout()
+
+
+def _analyze_one(i):
+    """Analyze one target with a wall-clock cap on the tree-edit-distance.
+
+    The TED permutation count grows factorially with reaction arity, and a few
+    ReactionT5 routes make the exact metric intractable.  On timeout we keep
+    the (cheap) solved flag and report the reference route as not recovered —
+    the same outcome the strict metric would almost surely give.
+    """
+    routes, ref, ks = _EVAL["routes"][i], _EVAL["refs"][i], _EVAL["ks"]
+    signal.signal(signal.SIGALRM, _raise_timeout)
+    signal.alarm(_EVAL["timeout"])
+    try:
+        return _analyze_routes(routes, ref, ks)
+    except _EvalTimeout:
+        stats = {"solved target": any(is_solved(r) for r in routes), "timeout": True}
+        for k in ks:
+            stats[f"best-{k}"] = 1e6
+        return stats
+    finally:
+        signal.alarm(0)
 
 
 def main() -> None:
@@ -56,6 +93,12 @@ def main() -> None:
     ap.add_argument("--references", required=True)
     ap.add_argument("--n", type=int, default=0, help="limit to first N targets (0 = all)")
     ap.add_argument("--ks", type=int, nargs="+", default=[1, 5, 10])
+    ap.add_argument("--workers", type=int, default=1,
+                    help="parallel worker processes over targets (1 = serial)")
+    ap.add_argument("--target-timeout", type=int, default=60,
+                    help="seconds allowed per target for the strict TED metric; "
+                         "on timeout the target keeps its solved flag but counts "
+                         "as not recovering the reference route")
     ap.add_argument("--method", required=True)
     ap.add_argument("--tag", default="")
     ap.add_argument("--route-set", required=True)
@@ -71,9 +114,21 @@ def main() -> None:
     routes_list = routes_list[:n]
     references = references[:n]
 
-    stats = []
-    for routes, reference in zip(routes_list, references):
-        stats.append(_analyze_routes(routes, reference, args.ks))
+    _EVAL["routes"], _EVAL["refs"], _EVAL["ks"] = routes_list, references, args.ks
+    _EVAL["timeout"] = args.target_timeout
+    n_items = len(routes_list)
+    workers = max(1, min(args.workers, n_items)) if n_items else 1
+    if workers == 1:
+        stats = [_analyze_one(i) for i in range(n_items)]
+    else:
+        import multiprocessing as mp
+        ctx = mp.get_context("fork")  # children inherit _EVAL and the perm patch
+        with ctx.Pool(workers) as pool:
+            stats = []
+            for s in pool.imap(_analyze_one, range(n_items), chunksize=16):
+                stats.append(s)
+                if len(stats) % 1000 == 0:
+                    print(f"  evaluated {len(stats)}/{n_items}", flush=True)
 
     n_targets = len(stats)
     n_solved = sum(1 for s in stats if s["solved target"])
@@ -84,6 +139,7 @@ def main() -> None:
         "n_targets": n_targets,
         "solved_targets": n_solved,
         "solve_rate": n_solved / n_targets if n_targets else 0.0,
+        "ted_timeouts": sum(1 for s in stats if s.get("timeout")),
     }
     for k in args.ks:
         topk = sum(1 for s in stats if s[f"best-{k}"] == 0) / n_targets if n_targets else 0.0

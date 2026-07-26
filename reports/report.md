@@ -1,6 +1,6 @@
 # Retrosynthesis Route Planning: ReactionT5-MCTS vs AiZynthFinder on PaRoutes
 
-*Generated 2026-07-23 09:39 UTC*
+*Generated 2026-07-25 13:09 UTC*
 
 This report evaluates a Monte-Carlo Tree Search (MCTS) retrosynthetic planner
 that uses **ReactionT5** (`sagawa/ReactionT5v2-retrosynthesis`) as the one-step
@@ -31,13 +31,13 @@ Base config: expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollou
 
 | config (tag) | route set | params | solved | solve rate | in-stock frac | top-1 | top-5 | top-10 | total time | time/target |
 |---|---|---|---|---|---|---|---|---|---|---|
-| base | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 9.7 min | 3.2 min |
-| c0p5 | n1 | expansion_width=5, iterations=100, c_puct=0.5, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.660 | 0.000 | 0.000 | 0.000 | 1.5 | 0.5 |
-| c3p0 | n1 | expansion_width=5, iterations=100, c_puct=3.0, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 4.4 | 1.5 |
-| ew3 | n1 | expansion_width=3, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.621 | 0.000 | 0.000 | 0.000 | 6.4 | 2.1 |
-| it200 | n1 | expansion_width=5, iterations=200, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 5.7 | 1.9 |
-| md8 | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=8, rollout_width=1, rollout_policy=stock, model_budget=15 | 0/3 | 0.000 | 0.642 | 0.000 | 0.000 | 0.000 | 1.2 min | 23.1 |
-| rprob | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=prob, model_budget=15 | 0/3 | 0.000 | 0.642 | 0.000 | 0.000 | 0.000 | 3.9 min | 1.3 min |
+| base | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 1.6 | 0.5 |
+| c0p5 | n1 | expansion_width=5, iterations=100, c_puct=0.5, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.660 | 0.000 | 0.000 | 0.000 | 6.8 | 2.3 |
+| c3p0 | n1 | expansion_width=5, iterations=100, c_puct=3.0, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 2.2 | 0.7 |
+| ew3 | n1 | expansion_width=3, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.621 | 0.000 | 0.000 | 0.000 | 3.4 | 1.1 |
+| it200 | n1 | expansion_width=5, iterations=200, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=stock, model_budget=15 | 1/3 | 0.333 | 0.661 | 0.000 | 0.000 | 0.000 | 2.8 | 0.9 |
+| md8 | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=8, rollout_width=1, rollout_policy=stock, model_budget=15 | 0/3 | 0.000 | 0.642 | 0.000 | 0.000 | 0.000 | 10.0 | 3.3 |
+| rprob | n1 | expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollout_width=1, rollout_policy=prob, model_budget=15 | 0/3 | 0.000 | 0.642 | 0.000 | 0.000 | 0.000 | 13.7 | 4.6 |
 
 ## 2. Main comparison: literature vs ReactionT5-MCTS (best) vs AiZynthFinder
 
@@ -51,10 +51,10 @@ Base config: expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollou
 | PaRoutes v2.0 — MCTS | n5 | 10000 | 9689 | 0.969 | N/A | 0.124 | 0.358 | 0.406 | N/A | N/A |
 | PaRoutes v2.0 — Retro* | n1 | 10000 | 9728 | 0.973 | N/A | 0.203 | 0.452 | 0.485 | N/A | N/A |
 | PaRoutes v2.0 — Retro* | n5 | 10000 | 9729 | 0.973 | N/A | 0.114 | 0.337 | 0.390 | N/A | N/A |
-| This work — AiZynthFinder | n1 | 8 | 2 | 0.250 | N/A | 0.000 | 0.000 | 0.000 | 5.1 min | 38.5 |
-| This work — AiZynthFinder | n5 | 8 | 3 | 0.375 | N/A | 0.000 | 0.000 | 0.000 | 5.2 min | 39.1 |
-| This work — ReactionT5-MCTS (best config: base) | n1 | 8 | 1 | 0.125 | 0.824 | 0.000 | 0.000 | 0.000 | 35.2 min | 4.4 min |
-| This work — ReactionT5-MCTS (best config: base) | n5 | 8 | 2 | 0.250 | 0.947 | 0.000 | 0.000 | 0.000 | 75.7 min | 9.5 min |
+| This work — AiZynthFinder | n1 | 10000 | 7538 | 0.754 | N/A | 0.059 | 0.107 | 0.107 | 138.2 min | 0.8 |
+| This work — AiZynthFinder | n5 | 10000 | 7413 | 0.741 | N/A | 0.030 | 0.070 | 0.070 | 110.4 min | 0.7 |
+| This work — ReactionT5-MCTS (best config: base) | n1 | 10000 | 6902 | 0.690 | 0.972 | 0.045 | 0.049 | 0.049 | 118.4 min | 0.7 |
+| This work — ReactionT5-MCTS (best config: base) | n5 | 10000 | 6390 | 0.639 | 0.966 | 0.021 | 0.024 | 0.024 | 7.2 min | 0.0 |
 
 ### Notes
 - **solve rate is the primary metric here** = number of targets for which at

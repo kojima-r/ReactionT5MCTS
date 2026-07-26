@@ -62,6 +62,10 @@ class ReactionT5:
 
         os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
         self._cache = sqlite3.connect(cache_path, check_same_thread=False)
+        # WAL + busy timeout so several worker processes can share one cache file
+        self._cache.execute("PRAGMA journal_mode=WAL")
+        self._cache.execute("PRAGMA busy_timeout=30000")
+        self._cache.execute("PRAGMA synchronous=NORMAL")
         self._cache.execute(
             "CREATE TABLE IF NOT EXISTS predictions ("
             "smiles TEXT NOT NULL, beams INTEGER NOT NULL, payload TEXT NOT NULL, "
