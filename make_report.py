@@ -111,7 +111,7 @@ def main_table(evals, metas, best_tag):
     # our experiments
     for (method, tag, rset), ev in sorted(evals.items()):
         is_best = method == "ReactionT5-MCTS" and tag == best_tag
-        is_azf = method == "AiZynthFinder"
+        is_azf = method.startswith("AiZynthFinder")
         if not (is_best or is_azf):
             continue
         meta = metas.get((method, tag, rset), {})
@@ -194,16 +194,16 @@ compares it with **AiZynthFinder** and the published literature values.
 deterministic and one-step predictions are memoised in a shared on-disk cache,
 so re-running yields identical routes.
 
-**Scope note.** Experiments were run on **CPU only** (no GPU available), where a
-single ReactionT5 beam-search call on a drug-like PaRoutes target costs ~30-45 s.
-The full benchmark (10,000 targets/set) is therefore intractable here, and each
-target is additionally capped at a fixed *budget* of fresh one-step model
-evaluations. ReactionT5-MCTS and AiZynthFinder were run on the **first N
-targets** of each set (see tables). The literature columns are the
-full-benchmark published values and are shown for context — the absolute counts
-are not directly comparable to the compute-bounded subset runs, but the
-comparison between ReactionT5-MCTS and AiZynthFinder is like-for-like on the
-identical subset.
+**Scope note.** Runs use GPU-backed ReactionT5 inference with target-level
+parallelism, so the **full benchmark (10,000 targets/set)** is evaluated for
+every "This work" row. Each ReactionT5-MCTS target is still capped at a fixed
+*budget* of fresh one-step model evaluations (memoised in a shared cache). Three
+planners are compared like-for-like on the identical full sets: **ReactionT5-MCTS**
+(best sweep config), **AiZynthFinder-MCTS**, and **AiZynthFinder-Retro\*** — the
+latter using the public USPTO expansion policy with the PaRoutes
+`retrostar_value_model.pickle` molecule-cost model. The literature columns are
+the full-benchmark published values, produced with the PaRoutes-specific
+template one-step models, and are shown for context.
 
 Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): **{best_sweep}**.
 """
@@ -238,6 +238,19 @@ Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): **{be
   different hardware over the full benchmark and report no runtime.
 - AiZynthFinder here uses the public USPTO expansion policy with the PaRoutes
   stock; the literature MCTS/Retro* rows use the PaRoutes-specific one-step models.
+- **AiZynthFinder-Retro\*** is the Retro\* search algorithm with the PaRoutes
+  `retrostar_value_model.pickle` as the molecule-cost (value) model, otherwise
+  identical policy/stock/budget to the AiZynthFinder-MCTS run. Comparing the two
+  "This work — AiZynthFinder" rows isolates the effect of the search algorithm
+  (MCTS vs Retro\*) with everything else held fixed.
+- **AiZynthFinder-*-PaRoutes** rows use the **literature one-step model**: the
+  route-set-specific expansion policy `uspto_rxn_n{1,5}_keras_model.hdf5`
+  (Zenodo 6275421, converted Keras→ONNX) with its matching template set, plus the
+  **literature search budget** (iteration_limit=500, time_limit=3600 s). These are
+  the faithful reproduction of the published PaRoutes MCTS/Retro\* rows; the plain
+  "AiZynthFinder" rows above use the generic public USPTO policy and a smaller
+  budget. The difference between them quantifies how much of the gap to the
+  literature comes from the one-step model + search budget rather than the planner.
 """)
     md_text = "\n".join(md)
     with open(os.path.join(REPORTS, "report.md"), "w") as fh:

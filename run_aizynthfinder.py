@@ -25,24 +25,53 @@ PAROUTES = os.path.join(HERE, "paroutes")
 _G: dict = {}  # per-worker AiZynthFinder instance
 
 
-def build_config(route_set: str, iteration_limit: int, time_limit: int) -> dict:
-    """Assemble an AiZynthFinder config dict (public USPTO policy + PaRoutes stock)."""
+def build_config(route_set: str, iteration_limit: int, time_limit: int,
+                 algorithm: str = "mcts", value_model: str = "",
+                 expansion_model: str = "", expansion_templates: str = "",
+                 all_routes: bool = False, max_routes: int = 25,
+                 stock_override: str = "") -> dict:
+    """Assemble an AiZynthFinder config dict (public USPTO policy + PaRoutes stock).
+
+    ``algorithm`` selects the search: "mcts" (default) or "retrostar".  For
+    Retro* a value/cost model can be supplied via ``value_model`` (the PaRoutes
+    ``retrostar_value_model.pickle``); with no model Retro* falls back to a zero
+    molecule cost.
+
+    ``expansion_model`` / ``expansion_templates`` override the one-step expansion
+    policy (default: the public USPTO ONNX policy).  Pass the PaRoutes
+    route-set-specific model+templates here to reproduce the literature setup.
+    """
     data = os.path.join(HERE, "aizynth_data")
-    stock_file = os.path.join(PAROUTES, "publication", f"aizynth_{route_set}_stock.txt")
+    model_file = expansion_model or os.path.join(data, "uspto_model.onnx")
+    template_file = expansion_templates or os.path.join(data, "uspto_templates.csv.gz")
+    stock_file = stock_override or os.path.join(
+        PAROUTES, "publication", f"aizynth_{route_set}_stock.txt")
+    # AiZynthFinder resolves "mcts" internally; every other algorithm must be a
+    # full class path (see aizynthfinder._setup_search_tree).
+    algo_spec = ("aizynthfinder.search.retrostar.search_tree.SearchTree"
+                 if algorithm == "retrostar" else algorithm)
+    search = {
+        "algorithm": algo_spec,
+        "max_transforms": 10,
+        "iteration_limit": iteration_limit,
+        "time_limit": time_limit,
+    }
+    if algorithm == "retrostar":
+        mol_cost = {"cost": "RetroStarCost", "model_path": value_model} if value_model \
+            else {"cost": "ZeroMoleculeCost"}
+        search["algorithm_config"] = {"molecule_cost": mol_cost}
     return {
         "expansion": {
-            "uspto": [
-                os.path.join(data, "uspto_model.onnx"),
-                os.path.join(data, "uspto_templates.csv.gz"),
-            ]
+            "uspto": [model_file, template_file]
         },
         "stock": {"paroutes": stock_file},
-        "search": {
-            "algorithm": "mcts",
-            "max_transforms": 10,
-            "iteration_limit": iteration_limit,
-            "time_limit": time_limit,
-        },
+        "search": search,
+        # match the literature config's route post-processing: extract ALL routes
+        # from the search tree so the evaluation-time route_scorer re-ranks the
+        # full set for the strict top-k metric (default AiZynthFinder keeps only
+        # nmin..nmax by its own scorer, which drops reference-matching routes).
+        "post_processing": {"all_routes": all_routes,
+                            "min_routes": 5, "max_routes": max_routes},
     }
 
 
@@ -79,7 +108,9 @@ def _run_target(job):
         route_dicts = [{"type": "mol", "smiles": tgt, "in_stock": False}]
     meta = {"index": i, "smiles": tgt, "solved": solved,
             "n_routes": len(finder.routes), "time_s": dt}
-    return (i, route_dicts[:10], meta)
+    # keep the full extracted route set (capped) so evaluate_routes' route_scorer
+    # can re-rank globally; _KEEP is set from --keep-routes (default 10 = legacy).
+    return (i, route_dicts[:_G.get("keep", 10)], meta)
 
 
 def main() -> None:
@@ -91,13 +122,45 @@ def main() -> None:
     ap.add_argument("--time-limit", type=int, default=120)
     ap.add_argument("--workers", type=int, default=1,
                     help="parallel worker processes over targets (1 = serial)")
+    ap.add_argument("--algorithm", choices=["mcts", "retrostar"], default="mcts",
+                    help="AiZynthFinder search algorithm")
+    ap.add_argument("--value-model", default="",
+                    help="path to a Retro* value/cost model pickle (retrostar only)")
+    ap.add_argument("--expansion-model", default="",
+                    help="override one-step expansion ONNX model (default: public USPTO)")
+    ap.add_argument("--expansion-templates", default="",
+                    help="override expansion template file (csv.gz or hdf5)")
+    ap.add_argument("--tag", default="azf",
+                    help="short name; controls output filenames (routes_<tag>_<rs>.json)")
+    ap.add_argument("--method", default="AiZynthFinder",
+                    help="method label written into the metadata summary")
+    ap.add_argument("--all-routes", action="store_true", default=False,
+                    help="extract ALL routes from the tree (literature config); "
+                         "with --keep-routes controls how many are stored/evaluated")
+    ap.add_argument("--max-routes", type=int, default=25,
+                    help="AiZynthFinder post_processing max_routes (ignored if --all-routes)")
+    ap.add_argument("--keep-routes", type=int, default=10,
+                    help="number of extracted routes to store per target for evaluation "
+                         "(evaluate_routes re-ranks these with route_scorer)")
+    ap.add_argument("--targets-file", default="",
+                    help="override targets file (default: paroutes/data/<rs>-targets.txt)")
+    ap.add_argument("--stock-file", default="",
+                    help="override AiZynthFinder stock file (InChIKey list)")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
-    cfg = build_config(args.route_set, args.iteration_limit, args.time_limit)
+    cfg = build_config(args.route_set, args.iteration_limit, args.time_limit,
+                       algorithm=args.algorithm, value_model=args.value_model,
+                       expansion_model=args.expansion_model,
+                       expansion_templates=args.expansion_templates,
+                       all_routes=args.all_routes, max_routes=args.max_routes,
+                       stock_override=args.stock_file)
+    _G["keep"] = args.keep_routes
 
-    with open(os.path.join(PAROUTES, "data", f"{args.route_set}-targets.txt")) as fh:
+    targets_path = args.targets_file or os.path.join(
+        PAROUTES, "data", f"{args.route_set}-targets.txt")
+    with open(targets_path) as fh:
         targets = [l.strip() for l in fh if l.strip()][: args.n_targets]
 
     workers = max(1, min(args.workers, len(targets))) if targets else 1
@@ -137,19 +200,22 @@ def main() -> None:
                       f"time={m['time_s']:6.1f}s", flush=True)
 
     total_time = time.time() - t_all
-    routes_path = os.path.join(args.out_dir, f"routes_azf_{args.route_set}.json")
-    meta_path = os.path.join(args.out_dir, f"meta_azf_{args.route_set}.json")
+    routes_path = os.path.join(args.out_dir, f"routes_{args.tag}_{args.route_set}.json")
+    meta_path = os.path.join(args.out_dir, f"meta_{args.tag}_{args.route_set}.json")
     with open(routes_path, "w") as fh:
         json.dump(all_routes, fh)
     n_solved = sum(m["solved"] for m in meta)
     summary = {
-        "tag": "azf", "route_set": args.route_set, "method": "AiZynthFinder",
+        "tag": args.tag, "route_set": args.route_set, "method": args.method,
         "n_targets": len(targets), "n_solved": n_solved,
         "solve_rate": n_solved / len(targets) if targets else 0.0,
         "total_time_s": total_time,
         "mean_time_per_target_s": total_time / len(targets) if targets else 0.0,
-        "config": {"algorithm": "mcts", "iteration_limit": args.iteration_limit,
-                   "time_limit": args.time_limit, "policy": "public USPTO",
+        "config": {"algorithm": args.algorithm, "iteration_limit": args.iteration_limit,
+                   "time_limit": args.time_limit,
+                   "policy": (os.path.basename(args.expansion_model) if args.expansion_model
+                              else "public USPTO"),
+                   "value_model": os.path.basename(args.value_model) if args.value_model else None,
                    "stock": f"PaRoutes {args.route_set}"},
         "workers": workers,
         "seed": args.seed, "per_target": meta,

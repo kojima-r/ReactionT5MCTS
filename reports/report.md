@@ -1,6 +1,6 @@
 # Retrosynthesis Route Planning: ReactionT5-MCTS vs AiZynthFinder on PaRoutes
 
-*Generated 2026-07-25 13:09 UTC*
+*Generated 2026-08-10 15:18 UTC*
 
 This report evaluates a Monte-Carlo Tree Search (MCTS) retrosynthetic planner
 that uses **ReactionT5** (`sagawa/ReactionT5v2-retrosynthesis`) as the one-step
@@ -11,16 +11,16 @@ compares it with **AiZynthFinder** and the published literature values.
 deterministic and one-step predictions are memoised in a shared on-disk cache,
 so re-running yields identical routes.
 
-**Scope note.** Experiments were run on **CPU only** (no GPU available), where a
-single ReactionT5 beam-search call on a drug-like PaRoutes target costs ~30-45 s.
-The full benchmark (10,000 targets/set) is therefore intractable here, and each
-target is additionally capped at a fixed *budget* of fresh one-step model
-evaluations. ReactionT5-MCTS and AiZynthFinder were run on the **first N
-targets** of each set (see tables). The literature columns are the
-full-benchmark published values and are shown for context — the absolute counts
-are not directly comparable to the compute-bounded subset runs, but the
-comparison between ReactionT5-MCTS and AiZynthFinder is like-for-like on the
-identical subset.
+**Scope note.** Runs use GPU-backed ReactionT5 inference with target-level
+parallelism, so the **full benchmark (10,000 targets/set)** is evaluated for
+every "This work" row. Each ReactionT5-MCTS target is still capped at a fixed
+*budget* of fresh one-step model evaluations (memoised in a shared cache). Three
+planners are compared like-for-like on the identical full sets: **ReactionT5-MCTS**
+(best sweep config), **AiZynthFinder-MCTS**, and **AiZynthFinder-Retro\*** — the
+latter using the public USPTO expansion policy with the PaRoutes
+`retrostar_value_model.pickle` molecule-cost model. The literature columns are
+the full-benchmark published values, produced with the PaRoutes-specific
+template one-step models, and are shown for context.
 
 Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): **sweep-base**.
 
@@ -53,6 +53,12 @@ Base config: expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollou
 | PaRoutes v2.0 — Retro* | n5 | 10000 | 9729 | 0.973 | N/A | 0.114 | 0.337 | 0.390 | N/A | N/A |
 | This work — AiZynthFinder | n1 | 10000 | 7538 | 0.754 | N/A | 0.059 | 0.107 | 0.107 | 138.2 min | 0.8 |
 | This work — AiZynthFinder | n5 | 10000 | 7413 | 0.741 | N/A | 0.030 | 0.070 | 0.070 | 110.4 min | 0.7 |
+| This work — AiZynthFinder-MCTS-PaRoutes | n1 | 10000 | 8440 | 0.844 | N/A | 0.038 | 0.100 | 0.101 | 388.5 min | 2.3 |
+| This work — AiZynthFinder-MCTS-PaRoutes | n5 | 10000 | 8444 | 0.844 | N/A | 0.016 | 0.059 | 0.060 | 363.1 min | 2.2 |
+| This work — AiZynthFinder-Retro* | n1 | 10000 | 7426 | 0.743 | N/A | 0.054 | 0.090 | 0.090 | 804.6 min | 4.8 |
+| This work — AiZynthFinder-Retro* | n5 | 10000 | 7396 | 0.740 | N/A | 0.028 | 0.059 | 0.059 | 844.2 min | 5.1 |
+| This work — AiZynthFinder-Retro*-PaRoutes | n1 | 10000 | 8397 | 0.840 | N/A | 0.026 | 0.062 | 0.062 | 3336.3 min | 20.0 |
+| This work — AiZynthFinder-Retro*-PaRoutes | n5 | 10000 | 8413 | 0.841 | N/A | 0.011 | 0.033 | 0.034 | 3385.6 min | 20.3 |
 | This work — ReactionT5-MCTS (best config: base) | n1 | 10000 | 6902 | 0.690 | 0.972 | 0.045 | 0.049 | 0.049 | 118.4 min | 0.7 |
 | This work — ReactionT5-MCTS (best config: base) | n5 | 10000 | 6390 | 0.639 | 0.966 | 0.021 | 0.024 | 0.024 | 7.2 min | 0.0 |
 
@@ -77,3 +83,16 @@ Base config: expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollou
   different hardware over the full benchmark and report no runtime.
 - AiZynthFinder here uses the public USPTO expansion policy with the PaRoutes
   stock; the literature MCTS/Retro* rows use the PaRoutes-specific one-step models.
+- **AiZynthFinder-Retro\*** is the Retro\* search algorithm with the PaRoutes
+  `retrostar_value_model.pickle` as the molecule-cost (value) model, otherwise
+  identical policy/stock/budget to the AiZynthFinder-MCTS run. Comparing the two
+  "This work — AiZynthFinder" rows isolates the effect of the search algorithm
+  (MCTS vs Retro\*) with everything else held fixed.
+- **AiZynthFinder-*-PaRoutes** rows use the **literature one-step model**: the
+  route-set-specific expansion policy `uspto_rxn_n{1,5}_keras_model.hdf5`
+  (Zenodo 6275421, converted Keras→ONNX) with its matching template set, plus the
+  **literature search budget** (iteration_limit=500, time_limit=3600 s). These are
+  the faithful reproduction of the published PaRoutes MCTS/Retro\* rows; the plain
+  "AiZynthFinder" rows above use the generic public USPTO policy and a smaller
+  budget. The difference between them quantifies how much of the gap to the
+  literature comes from the one-step model + search budget rather than the planner.
