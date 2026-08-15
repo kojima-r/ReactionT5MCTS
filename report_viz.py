@@ -159,6 +159,54 @@ def ablation_line_svg(points, series, xlabel, title, *, ymax=None,
     return "".join(P)
 
 
+def bar_chart_svg(points, title, *, ymax=None, value_fmt="{:.3f}",
+                  highlight=None, cls="rex-bar"):
+    """Generic single-series vertical bar chart.
+
+    points: list of {label, value, tip}.  `highlight` (a label) draws that bar
+    in the accent colour and the rest muted (e.g. to mark the baseline).
+    Colours come from CSS classes so the chart is theme-aware.
+    """
+    n = len(points)
+    W = max(360, 40 * n + 120)
+    padL, padR, padT, padB = 46, 14, 26, 64
+    plotw, ploth = W - padL - padR, 300 - padT - padB
+    gap = 14
+    bw = (plotw - gap * (n - 1)) / n if n else plotw
+    vals = [p.get("value", 0) or 0 for p in points]
+    top = ymax if ymax is not None else (max(vals) * 1.18 if vals and max(vals) > 0 else 1.0)
+
+    def y(v):
+        return padT + ploth * (1 - v / top)
+
+    P = [f'<svg viewBox="0 0 {W} 300" class="{cls}" role="img" '
+         f'aria-label="{html.escape(title)}" preserveAspectRatio="xMidYMid meet">']
+    P.append(f'<text x="{padL}" y="15" class="bc-title">{html.escape(title)}</text>')
+    for t in range(5):
+        gv = top * t / 4
+        yy = y(gv)
+        P.append(f'<line x1="{padL}" y1="{yy:.1f}" x2="{padL+plotw}" y2="{yy:.1f}" class="bc-grid"/>')
+        P.append(f'<text x="{padL-6}" y="{yy+3:.1f}" class="bc-ytick">{value_fmt.format(gv)}</text>')
+    for i, p in enumerate(points):
+        x = padL + i * (bw + gap)
+        v = p.get("value", 0) or 0
+        h = ploth * (v / top) if top else 0
+        yy = padT + ploth - h
+        hot = (highlight is not None and p["label"] == highlight)
+        fill = "bc-hot" if hot else "bc-bar"
+        P.append(f'<rect x="{x:.1f}" y="{yy:.1f}" width="{bw:.1f}" height="{h:.1f}" '
+                 f'rx="3" class="{fill}"><title>{html.escape(str(p["label"]))}: '
+                 f'{value_fmt.format(v)}{("  " + html.escape(p["tip"])) if p.get("tip") else ""}'
+                 f'</title></rect>')
+        P.append(f'<text x="{x+bw/2:.1f}" y="{yy-4:.1f}" class="bc-val">{value_fmt.format(v)}</text>')
+        # rotated label under the bar
+        lx, ly = x + bw / 2, padT + ploth + 12
+        P.append(f'<text x="{lx:.1f}" y="{ly:.1f}" class="bc-xlab" '
+                 f'transform="rotate(35 {lx:.1f} {ly:.1f})">{html.escape(str(p["label"]))}</text>')
+    P.append("</svg>")
+    return "".join(P)
+
+
 def ablation_chart_svg(rows: List[Dict[str, Any]]) -> str:
     """Inline SVG bar chart of in-stock fraction per sweep config.
 

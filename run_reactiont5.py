@@ -72,11 +72,21 @@ def _make_model(args, device: str, num_threads: int) -> ReactionT5:
     )
 
 
+def _make_yield_model(args, device: str, num_threads: int):
+    """Build the yield predictor (only when the reward needs it)."""
+    from rt5mcts.yield_model import ReactionT5Yield
+    return ReactionT5Yield(cache_path=args.yield_cache, device=device,
+                           num_threads=num_threads, seed=args.seed)
+
+
 def _worker_init(args, devices, num_threads, counter):
     with counter.get_lock():
         idx = counter.value
         counter.value += 1
-    _G["model"] = _make_model(args, devices[idx % len(devices)], num_threads)
+    device = devices[idx % len(devices)]
+    _G["model"] = _make_model(args, device, num_threads)
+    _G["yield_model"] = (_make_yield_model(args, device, num_threads)
+                         if args.needs_yield else None)
 
 
 def _run_target(job):
@@ -86,7 +96,7 @@ def _run_target(job):
     stock: Stock = _G["stock"]
     calls0, hits0 = model.n_model_calls, model.n_cache_hits
     cfg = MCTSConfig(seed=seed, **cfg_dict)
-    mcts = RetroMCTS(model, stock, cfg)
+    mcts = RetroMCTS(model, stock, cfg, yield_model=_G.get("yield_model"))
     t0 = time.time()
     try:
         mcts.search(tgt)
@@ -132,6 +142,20 @@ def main() -> None:
     ap.add_argument("--augment-stock", dest="augment_stock", action="store_true", default=True,
                     help="treat common reagents/solvents/ions as purchasable (default on)")
     ap.add_argument("--no-augment-stock", dest="augment_stock", action="store_false")
+    ap.add_argument("--reward-policy", default="",
+                    help="state-evaluation function (rt5mcts.reward registry): "
+                         "e.g. stock, yield. Empty = keep config/default (stock)")
+    ap.add_argument("--yield-weight", type=float, default=None,
+                    help="exponent on the yield term for reward_policy=yield")
+    ap.add_argument("--yield-agg", default="",
+                    help="yield aggregation: geomean|product|min|mean")
+    ap.add_argument("--reward-terms", default="",
+                    help='composite reward terms as JSON, e.g. '
+                         '\'{"in_stock":1,"shallow":1,"yield":1,"sa":0.5}\'')
+    ap.add_argument("--reward-combine", default="",
+                    help="composite combine mode: product|sum")
+    ap.add_argument("--yield-cache", default="cache/rt5_yield.sqlite",
+                    help="on-disk cache for step-yield predictions")
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
@@ -143,6 +167,22 @@ def main() -> None:
     cfg_dict.pop("seed", None)  # seed is controlled by --seed
     if args.model_budget >= 0:
         cfg_dict["model_budget"] = args.model_budget
+    # reward (state-evaluation) overrides: CLI wins over config, else default
+    if args.reward_policy:
+        cfg_dict["reward_policy"] = args.reward_policy
+    if args.yield_weight is not None:
+        cfg_dict["yield_weight"] = args.yield_weight
+    if args.yield_agg:
+        cfg_dict["yield_agg"] = args.yield_agg
+    if args.reward_terms:
+        cfg_dict["reward_terms"] = json.loads(args.reward_terms)
+    if args.reward_combine:
+        cfg_dict["reward_combine"] = args.reward_combine
+    # a worker builds the (expensive) yield model only if the reward needs it
+    from rt5mcts.reward import reward_needs_yield
+    args.reward_policy = cfg_dict.get("reward_policy", "stock")
+    args.needs_yield = reward_needs_yield(args.reward_policy,
+                                          cfg_dict.get("reward_terms"))
 
     targets = load_targets(args.route_set, args.n_targets)
     stock_path = os.path.join(PAROUTES, "data", f"{args.route_set}-stock.txt")
@@ -171,6 +211,8 @@ def main() -> None:
 
     if workers == 1:
         _G["model"] = _make_model(args, devices[0], threads_per_worker)
+        _G["yield_model"] = (_make_yield_model(args, devices[0], threads_per_worker)
+                             if args.needs_yield else None)
         results = map(_run_target, jobs)
         for i, routes, m, calls, hits in results:
             all_routes[i], meta[i] = routes, m

@@ -1,0 +1,1 @@
+{"expansion_width": 5, "iterations": 100, "c_puct": 1.4, "max_depth": 12, "rollout_width": 1, "rollout_policy": "stock", "model_budget": 20, "reward_policy": "sa"}

@@ -18,6 +18,9 @@ ReactionT5MCTS/
 ├── rt5mcts/                   # コアパッケージ
 │   ├── model.py               #   ReactionT5 ラッパー（永続SQLiteキャッシュ・予算制御・シード固定）
 │   ├── mcts.py                #   逆合成MCTS（PUCT選択・在庫貪欲ロールアウト・経路抽出）
+│   ├── tree.py                #   経路木のデータ構造とヘルパー（mctsから分離）
+│   ├── reward.py              #   差し替え可能な報酬（評価関数）: stock/yield/sa/composite/retrek
+│   ├── yield_model.py         #   収率予測 ReactionT5v2-yield ラッパー（永続SQLiteキャッシュ）
 │   ├── stock.py               #   在庫（購入可能分子）判定
 │   ├── chem.py                #   RDKit ユーティリティ（正準化・断片分割）
 │   └── reagents.py            #   一般的な試薬/溶媒/塩を「常時入手可能」として在庫に追加
@@ -160,7 +163,94 @@ conda run -n reactiont5 python make_report.py
 
 ---
 
-## 6. 出力
+## 6. 報酬（評価関数）の設定
+
+MCTS が「良い経路」を判断する **評価関数（報酬）は差し替え可能** です。報酬は経路木を
+`[0, 1]` のスカラー（大きいほど良い）に写す関数で、(1) ロールアウトのバックアップ値、
+(2) 解けた経路に保存されるスコア、(3) 最終ランキング、の 3 か所に使われます。報酬を変える
+だけで、探索本体に手を入れずにプランナの最適化目標を変更できます（実装: `rt5mcts/reward.py`）。
+
+報酬は **単体クラス** か、**複数の「項(term)」を重み付きで組み合わせた合成報酬** のいずれかです。
+
+### 6.1 組み込みの報酬（`reward_policy`）
+
+| policy | 内容 |
+|---|---|
+| `stock` | 従来の値（`reward_depth_decay^反応数 × 在庫葉の割合`）。既定。 |
+| `yield` | `stock` × （経路の集約収率）^`yield_weight`。ReactionT5v2-yield で各ステップの収率を予測。 |
+| `sa` | `合成容易性(SA) × 在庫割合 × 浅さ` の積プリセット。 |
+| `composite` | 任意の項を重み付きで結合する汎用報酬（`reward_terms` / `reward_combine`）。 |
+| `retrek` | ReTReK 型の 6 知識スコアを重み付き**和**で結合するプリセット（下記）。 |
+
+### 6.2 報酬項（term）と ReTReK 6 スコア
+
+`composite` / `retrek` は以下の項を `reward_terms={項:重み}` で自由に組み合わせられます
+（各項は経路→`[0,1]`、反応ステップ平均。反応が無い経路は中立値 1.0）。
+
+| 項名 | 意味 |
+|---|---|
+| `in_stock` | 葉分子のうち在庫（購入可能）な割合 |
+| `solved` | 全葉が在庫なら 1 |
+| `shallow` | `reward_depth_decay^反応数`（短い経路を優先） |
+| `yield` | 各ステップの予測収率の集約（`yield_agg`: geomean/product/min/mean） |
+| `sa` | 葉分子の合成容易性（RDKit SA、易しいほど高） |
+| **`cdscore`** | **Convergent Disconnection**: 反応物断片が同サイズ＝収束的なほど高（`min/max` 重原子数） |
+| **`asscore`** | **Available Substances**: 在庫（購入可能）葉の割合 |
+| **`rdscore`** | **Ring Disconnection**: 環を形成する反応（生成物の環数 > 反応物合計）なら高 |
+| **`stscore`** | **Selective Transformation**: 反応物が少ない（選択的）ほど高（`1/反応物数`） |
+| **`intermediate`** | **Intermediate**: 経路中間体の妥当さ（SA ベース） |
+| **`template`** | **Template**: 各反応に一段階モデルが与えた確率（well-precedented ほど高） |
+
+> ReTReK 6 スコア（cdscore, asscore, rdscore, stscore, intermediate, template）は公開論文の
+> 定義に基づく **独自実装** です（外部コードは参照していません）。加算的定式化に対応するため
+> `retrek` プリセットは `reward_combine="sum"`（重み付き平均）を既定とします。
+
+`reward_combine` は `product`（重み付き幾何積、`composite`/`sa` の既定）または
+`sum`（重み付き平均、`retrek` の既定）。空にすると各報酬の既定を使います。
+
+### 6.3 設定方法（4 通り）
+
+1. **CLI**（`run_reactiont5.py`）:
+   ```bash
+   # 収率報酬
+   --reward-policy yield --yield-weight 1.0 --yield-agg geomean
+
+   # ReTReK 6 スコア（プリセット）
+   --reward-policy retrek
+
+   # 任意の項を重み付きで（部分集合も可）
+   --reward-policy composite --reward-combine sum \
+     --reward-terms '{"in_stock":1,"shallow":1,"yield":1,"cdscore":1,"rdscore":0.5}'
+   ```
+2. **config JSON**（`--config`）: `reward_policy` / `reward_terms` / `reward_combine` /
+   `yield_weight` / `yield_agg` / `reward_depth_decay` を記述。例: `configs/base_yield.json`,
+   `configs/base_composite.json`, `configs/base_retrek.json`。
+3. **`make_reward()`**: `from rt5mcts.reward import make_reward; make_reward("retrek")`。
+4. **直接注入**: `RetroMCTS(model, stock, cfg, reward=<任意のcallable>)`。
+
+> 収率を使う報酬（`yield`、または `yield` 項を含む合成報酬）では収率モデル
+> `sagawa/ReactionT5v2-yield` を自動構築し、予測は `--yield-cache`（既定
+> `cache/rt5_yield.sqlite`）に永続キャッシュされます。不要な場合は構築されません。
+
+### 6.4 新しい報酬・項の追加
+
+3 行で追加できます（自動でレジストリに登録され、`reward_policy` / `reward_terms` から利用可能）。
+
+```python
+from rt5mcts.reward import RouteReward, register, term, RewardContext
+
+@term("my_term")                      # 新しい項: 経路 -> [0,1]
+def my_term(root, ctx: RewardContext): return ...
+
+@register                             # 新しい報酬クラス
+class MyReward(RouteReward):
+    name = "mine"
+    def score(self, root): return ...
+```
+
+---
+
+## 7. 出力
 
 | パス | 内容 |
 |---|---|
@@ -172,7 +262,7 @@ conda run -n reactiont5 python make_report.py
 
 ---
 
-## 7. 手法のポイント
+## 8. 手法のポイント
 
 - **一段階予測キャッシュ**: 正準SMILES＋ビーム幅をキーに SQLite へ保存。同一分子はモデルを1回だけ評価するため、
   sweep 全体・再実行で高速かつ結果が一貫。
@@ -186,7 +276,7 @@ conda run -n reactiont5 python make_report.py
 
 ---
 
-## 8. 結果（初回実行: 各8ターゲット, beam=5, budget=20, max_depth=12, ベスト設定=base）
+## 9. 結果（初回実行: 各8ターゲット, beam=5, budget=20, max_depth=12, ベスト設定=base）
 
 | 手法 | セット | solved | in-stock frac | top-1/5/10 | 時間/ターゲット |
 |---|---|---|---|---|---|
@@ -201,7 +291,7 @@ conda run -n reactiont5 python make_report.py
 
 ---
 
-## 9. 制約・注意点
+## 10. 制約・注意点
 
 - **CPU では低速**: n1 の創薬分子1件のビーム探索に約30〜45秒。PaRoutes のターゲットは8〜10段の深い経路のため、
   全10000ターゲットの評価は非現実的です。本リポジトリでは各セット少数（既定8）ターゲットに絞り、
@@ -214,7 +304,7 @@ conda run -n reactiont5 python make_report.py
 
 ---
 
-## 10. 再現性
+## 11. 再現性
 
 - すべての実行で乱数シードを固定（`--seed 42`）。ReactionT5 のビーム探索は決定的で、一段階予測はキャッシュされます。
 - GPU 非使用のため数値演算の非決定性もありません。
