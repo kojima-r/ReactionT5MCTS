@@ -72,6 +72,7 @@ code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px} em{color:#666}
 .rex-bar .bc-val{fill:#52514e;font-size:10px;font-weight:600;text-anchor:middle}
 .rex-bar .bc-xlab{fill:#52514e;font-size:10px;text-anchor:start}
 .rex-bar .bc-bar{fill:#9db8d6} .rex-bar .bc-hot{fill:#2a78d6}
+.rex-bar .bc-axlabel,.abl-line .axlabel{fill:#52514e;font-size:10px;text-anchor:middle;font-weight:600}
 .abl-line .bc-grid,.abl-line .grid{stroke:#e6e6e6}
 .abl-line .ytick,.abl-line .xtick{fill:#8a8a86;font-size:10px}
 .abl-line .ytick{text-anchor:end} .abl-line .xtick{text-anchor:middle}
@@ -88,6 +89,7 @@ code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px} em{color:#666}
   .rex-bar .bc-grid,.abl-line .bc-grid,.abl-line .grid{stroke:#333}
   .rex-bar .bc-val{fill:#c3c2b7} .rex-bar .bc-xlab,.abl-line .xlabel{fill:#c3c2b7}
   .rex-bar .bc-bar{fill:#3a536e} .rex-bar .bc-hot{fill:#3987e5}
+  .rex-bar .bc-axlabel,.abl-line .axlabel{fill:#c3c2b7}
   .abl-line .s-solve-rate{stroke:#3987e5;fill:#3987e5}
   .abl-line .s-top1{stroke:#d95926;fill:#d95926}
   .abl-line .s-mean-top-yield{stroke:#199e70;fill:#199e70}}
@@ -96,11 +98,12 @@ code{background:#f2f2f2;padding:.1rem .3rem;border-radius:3px} em{color:#666}
 
 def _set_blocks(rows, n, rset, rv, sec):
     """Return (html_str, md_str) for one route set's section."""
-    def bars(metric, title, fmt="{:.3f}"):
+    def bars(metric, title, fmt="{:.3f}", ylabel=""):
         pts = [{"label": r["label"], "value": r.get(metric),
                 "tip": f"solve {r['solve_rate']:.3f}"} for r in rows
                if r.get(metric) is not None]
-        return rv.bar_chart_svg(pts, title, value_fmt=fmt, highlight="stock")
+        return rv.bar_chart_svg(pts, title, value_fmt=fmt, highlight="stock",
+                                ylabel=ylabel)
 
     wmap = {"yield_w0.5": 0.5, "yield": 1.0, "yield_w2": 2.0, "yield_w4": 4.0}
     wpts = []
@@ -114,7 +117,8 @@ def _set_blocks(rows, n, rset, rv, sec):
         wpts, [("solve_rate", "solve", "#2a78d6", "#3987e5"),
                ("top1", "top-1", "#eb6834", "#d95926"),
                ("mean_top_yield", "top-route yield", "#1baf7a", "#199e70")],
-        "yield_weight", f"yield_weight sweep ({rset})", value_fmt="{:.2f}") if len(wpts) >= 2 else ""
+        "yield_weight", f"yield_weight sweep ({rset})", value_fmt="{:.2f}",
+        ylabel="value (fraction)") if len(wpts) >= 2 else ""
 
     html = [f"<h2>{sec}. {rset}（先頭 {n} ターゲット）</h2>",
             f"<h3>{sec}.1 全条件の比較表</h3>", _table(rows),
@@ -123,10 +127,14 @@ def _set_blocks(rows, n, rset, rv, sec):
             "queries/tgt は探索強度（cache非依存）。<code>stock</code> を基準色で強調。</p>",
             f"<h3>{sec}.2 報酬ごとの top ルート性質</h3>",
             "<div class='charts'>",
-            bars("mean_top_yield", f"top-route 平均予測収率 ({rset})", "{:.2f}"),
-            bars("mean_top_cdscore", f"top-route 収束性 CDScore ({rset})", "{:.2f}"),
-            bars("mean_top_sa_ease", f"top-route SA 容易性 ({rset})", "{:.2f}"),
-            bars("mean_n_reactions", f"top-route 反応段数 ({rset})", "{:.1f}"),
+            bars("mean_top_yield", f"top-route 平均予測収率 ({rset})", "{:.2f}",
+                 ylabel="predicted yield (0–1)"),
+            bars("mean_top_cdscore", f"top-route 収束性 CDScore ({rset})", "{:.2f}",
+                 ylabel="CDScore (0–1)"),
+            bars("mean_top_sa_ease", f"top-route SA 容易性 ({rset})", "{:.2f}",
+                 ylabel="SA-ease (0–1)"),
+            bars("mean_n_reactions", f"top-route 反応段数 ({rset})", "{:.1f}",
+                 ylabel="reactions / route"),
             "</div>",
             f"<h3>{sec}.3 yield_weight スイープ</h3>", wchart,
             f"<h3>{sec}.4 考察（{rset}）</h3>",

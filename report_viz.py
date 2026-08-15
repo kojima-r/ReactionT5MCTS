@@ -103,7 +103,7 @@ def _fmt_num(v):
 
 
 def ablation_line_svg(points, series, xlabel, title, *, ymax=None,
-                      value_fmt="{:.3f}", cost=False):
+                      value_fmt="{:.3f}", cost=False, ylabel=""):
     """Generic multi-line chart over an ordered set of ablation points.
 
     points: list of dicts each with the metric keys + 'label' (x tick) and a
@@ -140,6 +140,10 @@ def ablation_line_svg(points, series, xlabel, title, *, ymax=None,
         P.append(f'<text x="{xs[i]:.1f}" y="{padT+ploth+16:.1f}" class="xtick">'
                  f'{html.escape(str(p["label"]))}</text>')
     P.append(f'<text x="{padL+plotw/2:.1f}" y="{H-6:.1f}" class="xlabel">{html.escape(xlabel)}</text>')
+    if ylabel:
+        cy = padT + ploth / 2
+        P.append(f'<text x="10" y="{cy:.1f}" class="axlabel" '
+                 f'transform="rotate(-90 10 {cy:.1f})">{html.escape(ylabel)}</text>')
     # one polyline per series (colour via CSS class -> theme-aware)
     for key, lab, cl, cd in series:
         cls = "s-" + str(key).replace("_", "-")
@@ -160,7 +164,7 @@ def ablation_line_svg(points, series, xlabel, title, *, ymax=None,
 
 
 def bar_chart_svg(points, title, *, ymax=None, value_fmt="{:.3f}",
-                  highlight=None, cls="rex-bar"):
+                  highlight=None, cls="rex-bar", ylabel=""):
     """Generic single-series vertical bar chart.
 
     points: list of {label, value, tip}.  `highlight` (a label) draws that bar
@@ -187,6 +191,10 @@ def bar_chart_svg(points, title, *, ymax=None, value_fmt="{:.3f}",
         yy = y(gv)
         P.append(f'<line x1="{padL}" y1="{yy:.1f}" x2="{padL+plotw}" y2="{yy:.1f}" class="bc-grid"/>')
         P.append(f'<text x="{padL-6}" y="{yy+3:.1f}" class="bc-ytick">{value_fmt.format(gv)}</text>')
+    if ylabel:
+        cy = padT + ploth / 2
+        P.append(f'<text x="11" y="{cy:.1f}" class="bc-axlabel" '
+                 f'transform="rotate(-90 11 {cy:.1f})">{html.escape(ylabel)}</text>')
     for i, p in enumerate(points):
         x = padL + i * (bw + gap)
         v = p.get("value", 0) or 0
@@ -237,6 +245,10 @@ def ablation_chart_svg(rows: List[Dict[str, Any]]) -> str:
         parts.append(f'<line x1="{padL}" y1="{yy:.1f}" x2="{W-padR}" y2="{yy:.1f}" '
                      f'class="grid"/>')
         parts.append(f'<text x="{padL-6}" y="{yy+3:.1f}" class="ytick">{t:.2f}</text>')
+    # y-axis label
+    cy = padT + ploth / 2
+    parts.append(f'<text x="12" y="{cy:.1f}" class="axlabel" '
+                 f'transform="rotate(-90 12 {cy:.1f})">in-stock fraction (0–1)</text>')
     # bars
     for i, r in enumerate(rows):
         x = padL + i * (bw + gap)

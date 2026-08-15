@@ -1,6 +1,6 @@
 # Retrosynthesis Route Planning: ReactionT5-MCTS vs AiZynthFinder on PaRoutes
 
-*Generated 2026-08-14 07:29 UTC*
+*Generated 2026-08-15 09:03 UTC*
 
 This report evaluates a Monte-Carlo Tree Search (MCTS) retrosynthetic planner
 that uses **ReactionT5** (`sagawa/ReactionT5v2-retrosynthesis`) as the one-step
@@ -61,6 +61,8 @@ Base config: expansion_width=5, iterations=100, c_puct=1.4, max_depth=12, rollou
 | This work — AiZynthFinder-Retro*-PaRoutes | n5 | 10000 | 8413 | 0.841 | N/A | 0.011 | 0.033 | 0.034 | 3385.6 min | 20.3 |
 | This work — ReactionT5-MCTS (best config: base) | n1 | 10000 | 6902 | 0.690 | 0.972 | 0.045 | 0.049 | 0.049 | 118.4 min | 0.7 |
 | This work — ReactionT5-MCTS (best config: base) | n5 | 10000 | 6390 | 0.639 | 0.966 | 0.021 | 0.024 | 0.024 | 7.2 min | 0.0 |
+| This work — ReactionT5-MCTS (best reward: retrek) | n1 | 10000 | 6907 | 0.691 | 0.972 | 0.052 | 0.057 | 0.057 | 8.3 min | 0.0 |
+| This work — ReactionT5-MCTS (best reward: retrek) | n5 | 10000 | 6383 | 0.638 | 0.966 | 0.025 | 0.029 | 0.029 | 5.3 min | 0.0 |
 
 ### Notes
 - **solve rate is the primary metric here** = number of targets for which at

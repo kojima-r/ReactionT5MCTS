@@ -111,13 +111,16 @@ def main_table(evals, metas, best_tag):
     # our experiments
     for (method, tag, rset), ev in sorted(evals.items()):
         is_best = method == "ReactionT5-MCTS" and tag == best_tag
+        is_bestrwd = method == "ReactionT5-MCTS" and tag == "bestrwd"
         is_azf = method.startswith("AiZynthFinder")
-        if not (is_best or is_azf):
+        if not (is_best or is_bestrwd or is_azf):
             continue
         meta = metas.get((method, tag, rset), {})
         label = f"This work — {method}"
         if is_best:
             label += f" (best config: {best_config_name()})"
+        elif is_bestrwd:
+            label += " (best reward: retrek)"
         rows.append([
             label, rset, ev["n_targets"],
             f"{ev['solved_targets']}", fmt_pct(ev["solve_rate"]),
@@ -314,9 +317,11 @@ def ablation_section_html():
                             "tip": f"{p.get('time_per_target_s',0):.2f}s/target (warm cache), "
                                    f"{p.get('model_calls',0)} fresh calls this run"})
         quality = rv.ablation_line_svg(
-            qpoints, rv._QSERIES, xlabel, f"{var}: quality", value_fmt="{:.2f}")
+            qpoints, rv._QSERIES, xlabel, f"{var}: quality", value_fmt="{:.2f}",
+            ylabel="fraction of targets")
         cost = rv.ablation_line_svg(
-            cpoints, cost_series, xlabel, f"{var}: search work", value_fmt="{:.0f}")
+            cpoints, cost_series, xlabel, f"{var}: search work", value_fmt="{:.0f}",
+            ylabel="queries / target")
         figs.append(f'<div class="abl-fig"><div class="abl-pair">{quality}{cost}</div></div>')
     n = meta.get("n_targets", "?")
     intro = (f'<p>Each variable is swept while all others stay at the baseline '
@@ -443,6 +448,7 @@ Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): **{be
     .ablation-svg .cfgname{fill:#1a1a1a;font-size:12px;font-weight:600;text-anchor:middle}
     .ablation-svg .cfgchg{fill:#8a8a86;font-size:10px;text-anchor:middle}
     .ablation-svg .axtitle{fill:#52514e;font-size:12px}
+    .ablation-svg .axlabel,.abl-line .axlabel{fill:#52514e;font-size:11px;text-anchor:middle;font-weight:600}
     .ablation-svg .status{font-size:13px;text-anchor:middle}
     .ablation-svg .status.ok{fill:#008300} .ablation-svg .status.no{fill:#c0392b}
     .chart-cap{font-size:.85rem;color:#666;max-width:760px;margin:.2rem 0 1.5rem}
@@ -515,6 +521,7 @@ Best ReactionT5-MCTS sweep configuration (by solve rate on the n1 subset): **{be
       .ablation-svg .axtitle{fill:#c3c2b7}
       .abl-line .abl-title{fill:#e6e6e6} .abl-line .grid{stroke:#333}
       .abl-line .xlabel{fill:#c3c2b7}
+      .ablation-svg .axlabel,.abl-line .axlabel{fill:#c3c2b7}
       .abl-line .s-solve-rate{stroke:#3987e5;fill:#3987e5}
       .abl-line .s-top1{stroke:#d95926;fill:#d95926}
       .abl-line .s-top5{stroke:#199e70;fill:#199e70}
